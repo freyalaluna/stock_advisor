@@ -1,4 +1,6 @@
-pyspark
+pyspark==3.5.2
 torch
 pandas
 numpy
+transformers==4.56.0
+decord==0.6.0
