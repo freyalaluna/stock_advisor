@@ -155,3 +155,18 @@ if __name__ == "__main__":
   print(f"Num predictions: {len(predictions)}")
   
   spark.stop()
+  
+def evaluate(predicted_prices, actual_prices):
+  mse = np.mean((predicted_prices - actual_prices) ** 2)
+  mae = np.mean(np.abs(predicted_prices - actual_prices))
+  rmse = np.sqrt(mse)
+  ss_residual = np.sum((actual_prices - predicted_prices) ** 2)
+  ss_total = np.sum((actual_prices - np.mean(actual_prices)) ** 2)
+  r2_score = 1 - ss_residual / ss_total
+    
+    
+  print(f"MSE:  {mse:.4f}")
+  print(f"MAE:  {mae:.4f}")
+  print(f"RMSE: {rmse:.4f}")
+  print(f"R^2:  {r2_score:.4f}")
+  
