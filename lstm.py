@@ -2,7 +2,8 @@ from pyspark.sql import SparkSession
 import numpy as np
 import torch
 import torch.nn as nn
-
+import matplotlib.pyplot as plt
+import numpy as np
 
 class StockNN(nn.Module):
   def __init__(self, input_size, hidden_size):
@@ -169,4 +170,17 @@ def evaluate(predicted_prices, actual_prices):
   print(f"MAE:  {mae:.4f}")
   print(f"RMSE: {rmse:.4f}")
   print(f"R^2:  {r2_score:.4f}")
+  
+  
+def plot_predictions(predicted_prices, actual_prices):
+    predicted_prices = np.array(predicted_prices)
+    actual_prices = np.array(actual_prices)
+    plt.figure()
+    plt.plot(actual_prices, label="Actual")
+    plt.plot(predicted_prices, label="Predicted")
+    plt.legend()
+    plt.xlabel("Sample Index")
+    plt.ylabel("Stock Price")
+    plt.title("Predicted vs Actual Stock Prices")
+    plt.show()
   
