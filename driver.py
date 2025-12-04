@@ -15,8 +15,8 @@ def main() -> None:
              .master("yarn")
              .getOrCreate())
 
-    # filterNews.execute(targetStocks)
-    # filterStocks.execute(files)
+    filterNews.execute(targetStocks)
+    filterStocks.execute(files)
     joinStocksWithNews.execute()
     model.execute()
 

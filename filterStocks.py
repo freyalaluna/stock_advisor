@@ -56,7 +56,7 @@ def execute(files):
     allStockWindows = totalStockHistory.withColumns({"end_date": sf.date_add("date", 30),
                                                      "window": sf.collect_list(totalStockHistory.high).over(timeframe),
                                                      "variance": sf.variance(totalStockHistory.high).over(timeframe),
-                                                     "seven_day_target": sf.lead(totalStockHistory.high, 37).over(seven_after)
+                                                     "seven_day_target": sf.lead(totalStockHistory.high, 31).over(seven_after)
                                                      })
 
     allStockWindows = allStockWindows.withColumnRenamed("date", "start_date").drop("high")

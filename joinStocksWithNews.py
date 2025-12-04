@@ -42,5 +42,5 @@ def execute():
 
     stocksWithHeadlines = stocksWithHeadlines.select(["ticker", "start_date", "end_date", "stock_highs_30d", "target_price_7d",
                                                       "stock_var", "news_sentiment_5d", "news_confidence_5d"])
-    print(stocksWithHeadlines.dtypes)
+
     stocksWithHeadlines.write.parquet("/StockAdvisor/datasets/filtered/stocksWithSentiments", mode="overwrite")
