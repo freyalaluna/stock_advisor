@@ -3,13 +3,12 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-
 class StockNN(nn.Module):
   def __init__(self, input_size, hidden_size):
     super(StockNN, self).__init__()
     self.fc1 = nn.Linear(input_size, hidden_size)
     self.relu = nn.ReLU()
-    self.fc2 = nn.Linear(hidden_size, 1)
+    self.fc2 = nn.Linear(hidden_size, 2)
   
   def forward(self, x):
     x = self.fc1(x)
@@ -54,16 +53,16 @@ def prepare_data(data):
   
   return X, y
 
-
-def train(partition_data, model_state, epochs_per_partition):
+def train(partition_data, weights, epochs_per_partition):
   X, y = partition_data
   
   X_tensor = torch.FloatTensor(X)
   y_tensor = torch.FloatTensor(y)
   
   model = StockNN(52, 50)
-  model.load_state_dict(model_state)
+  model.load_state_dict(weights)
   
+  # mse and adam are most common for stock predictors
   criterion = nn.MSELoss()
   optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
   
@@ -83,7 +82,15 @@ def train(partition_data, model_state, epochs_per_partition):
   
   return model.state_dict()
 
-
+"""
+Ideology for combine: add all the weight matrices
+to a dictionary, use stack to convert to a
+[N, 52, 50] matrix, where each 'row' (dim=0) is
+a matrix of model weights. Then calculate mean
+along that axis to collaps back to a [52,50]
+weight matrix that can be used in the new updated
+model
+"""
 def combine_models(states):
   combined = dict()
   
@@ -91,7 +98,6 @@ def combine_models(states):
     combined[key] = torch.stack([state[key] for state in states]).mean(dim=0)
   
   return combined
-
 
 def distributed_train(data, num_partitions, epochs, epochs_per_partition):
   X, y = prepare_data(data)
@@ -102,7 +108,6 @@ def distributed_train(data, num_partitions, epochs, epochs_per_partition):
   
   model = StockNN(52, 50)
   state = model.state_dict()
-  
   sc = data.rdd.context
   
   for _ in range(epochs):
@@ -110,7 +115,7 @@ def distributed_train(data, num_partitions, epochs, epochs_per_partition):
     broadcasted = sc.broadcast(state)                                           # send the updated weights to every training task
     partitions_rdd = sc.parallelize(partitioned_data, num_partitions)           # convert the partitions of data into an RDD
     updated_states = partitions_rdd.map(                                        # train on each partition with a different spark task
-        lambda p: train(p, broadcasted.value, epochs_per_partition)
+        lambda x: train(x, broadcasted.value, epochs_per_partition)
     ).collect()
     
     state = combine_models(updated_states)                                      # rejoin the weights
@@ -119,7 +124,6 @@ def distributed_train(data, num_partitions, epochs, epochs_per_partition):
   out.load_state_dict(state)                                                    # load the weights to the model
   
   return out
-
 
 def predict(model, data):
   X, y = prepare_data(data)
