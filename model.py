@@ -11,12 +11,14 @@ class StockNN(nn.Module):
     self.fc1 = nn.Linear(input_size, hidden_size)
     self.relu = nn.ReLU()
     self.fc2 = nn.Linear(hidden_size, hidden_size)
+    self.relu2 = nn.ReLU()
     self.fc3 = nn.Linear(hidden_size, 1)
   
   def forward(self, x):
     x = self.fc1(x)
     x = self.relu(x)
     x = self.fc2(x)
+    x = self.fc3(x)
     return x
 
 """
@@ -24,14 +26,20 @@ This assumes that the data arrives in a spark dataframe with
 the labels attached as listed. I doubt this is the case, so
 consider this entire method a TODO
 """
-def prepare_data(data):
+def prepare_data(data, randomize=True):
   df = data.toPandas()
   
   X_list = []
   y_list = []
-  
-  for i in range(len(df)):
-    row = df.iloc[i]
+
+  # reproduceable shuffle of pandas dataframe
+  if randomize:
+    shuffled = df.sample(frac=1, random_state=42).reset_index(drop=True)
+  else:
+    shuffled = df
+
+  for i in range(len(shuffled)):
+    row = shuffled.iloc[i]
     
     stock_highs = row['stock_highs_30d']
     sentiment = row['news_sentiment_5d'] 
@@ -67,7 +75,7 @@ def train(partition_data, weights, epochs_per_partition):
   
   # mse and adam are most common for stock predictors
   criterion = nn.MSELoss()
-  optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+  optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
   
   for epoch in range(epochs_per_partition):
     model.train()
@@ -104,7 +112,7 @@ def combine_models(states):
 
 def distributed_train(data, num_partitions, epochs, epochs_per_partition):
   X, y = prepare_data(data)
-  
+
   X_partitions = np.array_split(X, num_partitions)
   y_partitions = np.array_split(y, num_partitions)
   partitioned_data = list(zip(X_partitions, y_partitions))
@@ -129,7 +137,7 @@ def distributed_train(data, num_partitions, epochs, epochs_per_partition):
   return out
 
 def predict(model, data):
-  X, y = prepare_data(data)
+  X, y = prepare_data(data, False)
   X = torch.FloatTensor(X)
   
   model.eval()
@@ -148,8 +156,8 @@ def execute():
   print(f"Train size: {train_df.count()}")
   print(f"Test size: {test_df.count()}")
   
-  num_partitions = 5
-  epochs = 10
+  num_partitions = 15
+  epochs = 100
   epochs_per_partition = 5
   model = distributed_train(train_df, num_partitions, epochs, epochs_per_partition)
 
