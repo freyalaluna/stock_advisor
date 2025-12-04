@@ -15,9 +15,9 @@ def main() -> None:
              .master("yarn")
              .getOrCreate())
 
-    filterNews.execute(targetStocks)
-    filterStocks.execute(files)
-    joinStocksWithNews.execute()
+    # filterNews.execute(targetStocks)
+    # filterStocks.execute(files)
+    # joinStocksWithNews.execute()
     model.execute()
 
     spark.stop()
