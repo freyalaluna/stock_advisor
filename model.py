@@ -35,9 +35,16 @@ def prepare_data(data):
     sentiment = row['news_sentiment_5d'] 
     confidence = row['news_confidence_5d']
     variance = row['stock_var']
+
+    sentiment_list = list(sentiment)
+    confidence_list = list(confidence)
+    if(len(sentiment_list) < 10):
+      for i in range(10-len(sentiment_list)): sentiment_list.append(0)
+      for i in range(10-len(confidence_list)): confidence_list.append(0.0)
+
     
     # just flatten to a feature list since not LSTM anymore
-    features = list(stock_highs) + list(sentiment) + list(confidence) + [variance]
+    features = list(stock_highs) + sentiment_list + confidence_list + [variance]
     
     X_list.append(features)
     y_list.append(row['target_price_7d'])
@@ -123,22 +130,21 @@ def predict(model, data):
   
   return predictions.detach().numpy().flatten()
 
-if __name__ == "__main__":
+def execute():
     
-  spark = SparkSession.builder.appName("CS435 Term Project").getOrCreate()
-  
-  data = []
-  for i in range(1000):
-    data.append({
-      'ticker': f'STOCK{i}',
-      'stock_highs_30d': [float(x) for x in np.random.randn(30)],
-      'news_sentiment_5d': [float(x) for x in np.random.randn(5)],
-      'news_confidence_5d': [float(x) for x in np.random.rand(5)],
-      'stock_var': float(np.random.rand()),
-      'target_price_7d': float(np.random.randn())
-    })
-  
-  df = spark.createDataFrame(data)
+  spark = SparkSession.builder.getOrCreate()
+
+  df = spark.read.parquet("/StockAdvisor/datasets/filtered/stocksWithSentiments").orderBy("ticker")
+  # for i in range(1000):
+  #   data.append({
+  #     'ticker': f'STOCK{i}',
+  #     'stock_highs_30d': [float(x) for x in np.random.randn(30)],
+  #     'news_sentiment_5d': [float(x) for x in np.random.randn(5)],
+  #     'news_confidence_5d': [float(x) for x in np.random.rand(5)],
+  #     'stock_var': float(np.random.rand()),
+  #     'target_price_7d': float(np.random.randn())
+  #   })
+  # df = spark.createDataFrame(data)
   
   train_df, test_df = df.randomSplit([0.8, 0.2])
   
@@ -154,19 +160,5 @@ if __name__ == "__main__":
   
   print(f"Num predictions: {len(predictions)}")
   
-  spark.stop()
-  
-def evaluate(predicted_prices, actual_prices):
-  mse = np.mean((predicted_prices - actual_prices) ** 2)
-  mae = np.mean(np.abs(predicted_prices - actual_prices))
-  rmse = np.sqrt(mse)
-  ss_residual = np.sum((actual_prices - predicted_prices) ** 2)
-  ss_total = np.sum((actual_prices - np.mean(actual_prices)) ** 2)
-  r2_score = 1 - ss_residual / ss_total
-    
-    
-  print(f"MSE:  {mse:.4f}")
-  print(f"MAE:  {mae:.4f}")
-  print(f"RMSE: {rmse:.4f}")
-  print(f"R^2:  {r2_score:.4f}")
+  # spark.stop()\
   
