@@ -2,7 +2,6 @@ from pyspark.sql import SparkSession
 import numpy as np
 import torch
 import torch.nn as nn
-import matplotlib.pyplot as plt
 
 
 class StockNN(nn.Module):
