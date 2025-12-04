@@ -35,9 +35,16 @@ def prepare_data(data):
     sentiment = row['news_sentiment_5d'] 
     confidence = row['news_confidence_5d']
     variance = row['stock_var']
+
+    sentiment_list = list(sentiment)
+    confidence_list = list(confidence)
+    if(len(sentiment_list) < 10):
+      for i in range(10-len(sentiment_list)): sentiment_list.append(0)
+      for i in range(10-len(confidence_list)): confidence_list.append(0.0)
+
     
     # just flatten to a feature list since not LSTM anymore
-    features = list(stock_highs) + list(sentiment) + list(confidence) + [variance]
+    features = list(stock_highs) + sentiment_list + confidence_list + [variance]
     
     X_list.append(features)
     y_list.append(row['target_price_7d'])
@@ -54,7 +61,7 @@ def train(partition_data, model_state, epochs_per_partition):
   X_tensor = torch.FloatTensor(X)
   y_tensor = torch.FloatTensor(y)
   
-  model = StockNN(41, 50)
+  model = StockNN(52, 50)
   model.load_state_dict(model_state)
   
   criterion = nn.MSELoss()
@@ -93,7 +100,7 @@ def distributed_train(data, num_partitions, epochs, epochs_per_partition):
   y_partitions = np.array_split(y, num_partitions)
   partitioned_data = list(zip(X_partitions, y_partitions))
   
-  model = StockNN(41, 50)
+  model = StockNN(52, 50)
   state = model.state_dict()
   
   sc = data.rdd.context
@@ -108,7 +115,7 @@ def distributed_train(data, num_partitions, epochs, epochs_per_partition):
     
     state = combine_models(updated_states)                                      # rejoin the weights
   
-  out = StockNN(41, 50)                                                         # createa. new model to hold the final weights (can be used for testing)
+  out = StockNN(52, 50)                                      # create a new model to hold the final weights (can be used for testing)
   out.load_state_dict(state)                                                    # load the weights to the model
   
   return out
@@ -121,24 +128,13 @@ def predict(model, data):
   model.eval()
   predictions = model(X)
   
-  return predictions.detach().numpy().flatten()
+  return predictions.detach().numpy().flatten(), y
 
-if __name__ == "__main__":
+def execute():
     
-  spark = SparkSession.builder.appName("CS435 Term Project").getOrCreate()
-  
-  data = []
-  for i in range(1000):
-    data.append({
-      'ticker': f'STOCK{i}',
-      'stock_highs_30d': [float(x) for x in np.random.randn(30)],
-      'news_sentiment_5d': [float(x) for x in np.random.randn(5)],
-      'news_confidence_5d': [float(x) for x in np.random.rand(5)],
-      'stock_var': float(np.random.rand()),
-      'target_price_7d': float(np.random.randn())
-    })
-  
-  df = spark.createDataFrame(data)
+  spark = SparkSession.builder.getOrCreate()
+
+  df = spark.read.parquet("/StockAdvisor/datasets/filtered/stocksWithSentiments").orderBy("ticker")
   
   train_df, test_df = df.randomSplit([0.8, 0.2])
   
@@ -149,24 +145,8 @@ if __name__ == "__main__":
   epochs = 10
   epochs_per_partition = 5
   model = distributed_train(train_df, num_partitions, epochs, epochs_per_partition)
-  
-  predictions = predict(model, test_df)
+
+  (predictions, actual) = predict(model, test_df)
   
   print(f"Num predictions: {len(predictions)}")
-  
-  spark.stop()
-  
-def evaluate(predicted_prices, actual_prices):
-  mse = np.mean((predicted_prices - actual_prices) ** 2)
-  mae = np.mean(np.abs(predicted_prices - actual_prices))
-  rmse = np.sqrt(mse)
-  ss_residual = np.sum((actual_prices - predicted_prices) ** 2)
-  ss_total = np.sum((actual_prices - np.mean(actual_prices)) ** 2)
-  r2_score = 1 - ss_residual / ss_total
-    
-    
-  print(f"MSE:  {mse:.4f}")
-  print(f"MAE:  {mae:.4f}")
-  print(f"RMSE: {rmse:.4f}")
-  print(f"R^2:  {r2_score:.4f}")
   
