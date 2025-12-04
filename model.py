@@ -2,6 +2,8 @@ from pyspark.sql import SparkSession
 import numpy as np
 import torch
 import torch.nn as nn
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 class StockNN(nn.Module):
@@ -149,4 +151,34 @@ def execute():
   (predictions, actual) = predict(model, test_df)
   
   print(f"Num predictions: {len(predictions)}")
+  
+def evaluate(predicted_prices, actual_prices):
+  mse = np.mean((predicted_prices - actual_prices) ** 2)
+  mae = np.mean(np.abs(predicted_prices - actual_prices))
+  rmse = np.sqrt(mse)
+  ss_residual = np.sum((actual_prices - predicted_prices) ** 2)
+  ss_total = np.sum((actual_prices - np.mean(actual_prices)) ** 2)
+  r2_score = 1 - ss_residual / ss_total
+
+
+  print(f"MSE:  {mse:.4f}")
+  print(f"MAE:  {mae:.4f}")
+  print(f"RMSE: {rmse:.4f}")
+  print(f"R^2:  {r2_score:.4f}")
+  
+def plot_predictions(predicted_prices, actual_prices, filename="predicted_vs_actual.png"):
+  predicted_prices = np.array(predicted_prices)
+  actual_prices = np.array(actual_prices)
+
+  plt.figure()
+  plt.plot(actual_prices, label="Actual")
+  plt.plot(predicted_prices, label="Predicted")
+  plt.legend()
+  plt.xlabel("Sample Index")
+  plt.ylabel("Stock Price")
+  plt.title("Predicted vs Actual Stock Prices")
+
+  plt.savefig(filename)
+  plt.close()
+
   

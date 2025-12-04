@@ -1,5 +1,7 @@
 from pyspark.sql import SparkSession
 from pyspark import SparkConf, SparkContext
+import numpy as np
+from model import evaluate, plot_predictions
 
 sc = SparkContext("local", "test")
 data = [1,2,3,4,5]
@@ -24,3 +26,12 @@ sc.stop()
 #
 # # Stop the SparkSession
 # spark.stop()
+
+
+
+if __name__ == "__main__":
+    actual = np.array([100, 102, 101, 105, 110, 115, 120])
+    predicted = np.array([98, 101, 103, 104, 112, 117, 119])
+
+    evaluate(predicted, actual)
+    plot_predictions(predicted, actual)
