@@ -8,7 +8,8 @@ class StockNN(nn.Module):
     super(StockNN, self).__init__()
     self.fc1 = nn.Linear(input_size, hidden_size)
     self.relu = nn.ReLU()
-    self.fc2 = nn.Linear(hidden_size, 2)
+    self.fc2 = nn.Linear(hidden_size, hidden_size)
+    self.fc3 = nn.Linear(hidden_size, 1)
   
   def forward(self, x):
     x = self.fc1(x)
