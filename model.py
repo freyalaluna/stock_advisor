@@ -164,6 +164,8 @@ def execute():
   (predictions, actual) = predict(model, test_df)
   
   print(f"Num predictions: {len(predictions)}")
+  evaluate(predictions, actual)
+  plot_predictions(predictions, actual)
   
 def evaluate(predicted_prices, actual_prices):
   mse = np.mean((predicted_prices - actual_prices) ** 2)
