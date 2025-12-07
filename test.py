@@ -3,6 +3,7 @@ from pyspark import SparkConf, SparkContext
 import numpy as np
 from model import *
 import torch
+import matplotlib.pyplot as plt
 
 def test_spark_rdd():
     sc = SparkContext("local", "test")
@@ -237,6 +238,160 @@ def test_combine_empty():
         combine_models([])
     except Exception as e:
         print("Got exception as expected:", e)
+        
+def make_df_52(spark, n):
+    data = []
+    for i in range(n):
+        row = {
+            "stock_highs_30d": [100 + i] * 31,
+            "news_sentiment_5d": [1, 0, -1, 1, 0],
+            "news_confidence_5d": [0.9, 0.8, 0.85, 0.7, 0.6],
+            "stock_var": 1.5,
+            "target_price_7d": 110.0,
+        }
+        data.append(row)
+    df = spark.createDataFrame(data)
+    return df
+
+def test_distributed_train():
+    print("\ndistributed train normal")
+
+    spark = SparkSession.builder.master("local[*]").appName("distributedTrainNormal").getOrCreate()
+    df = make_df_52(spark, 4)
+
+    model = distributed_train(df, num_partitions=2, epochs=1, epochs_per_partition=1)
+
+    x = torch.randn(2, 52)
+    out = model(x)
+
+    print("Output shape:", out.shape)
+
+    spark.stop()
+
+
+def test_distributed_train_zero():
+    print("\ndistributed train zero")
+
+    spark = SparkSession.builder.master("local[*]").appName("distributedTrainZero").getOrCreate()
+    df = make_df_52(spark, 4)
+
+    model = distributed_train(df, num_partitions=2, epochs=0, epochs_per_partition=2)
+
+    x = torch.randn(1, 52)
+    out = model(x)
+
+    print("Output shape:", out.shape)
+
+    spark.stop()
+
+
+def test_distributed_train_single():
+    print("\ndistributed train single")
+
+    spark = SparkSession.builder.master("local[*]").appName("distributedTrainSingle").getOrCreate()
+    df = make_df_52(spark, 1)
+
+    model = distributed_train(df, num_partitions=1, epochs=1, epochs_per_partition=1)
+
+    x = torch.randn(1, 52)
+    out = model(x)
+
+    print("Output shape:", out.shape)
+
+    spark.stop()
+
+def test_predict():
+    print("\npredict normal")
+
+    spark = SparkSession.builder.master("local[*]").appName("predictNormal").getOrCreate()
+    df = make_df_52(spark, 5)
+
+    model = StockNN(52, 50)
+    preds, targets = predict(model, df)
+
+    print("Pred length:", len(preds))
+    print("Target length:", len(targets))
+
+    spark.stop()
+
+
+def test_predict_single():
+    print("\npredict single row")
+
+    spark = SparkSession.builder.master("local[*]").appName("predictSingle").getOrCreate()
+    df = make_df_52(spark, 1)
+
+    model = StockNN(52, 50)
+    preds, targets = predict(model, df)
+
+    print("Pred length:", len(preds))
+    print("Target value:", targets[0])
+
+    spark.stop()
+
+
+def test_predict_empty():
+    print("\npredict empty")
+
+    spark = SparkSession.builder.master("local[*]").appName("predictEmpty").getOrCreate()
+
+    schema = ""
+    df = spark.createDataFrame([], schema=schema)
+
+    model = StockNN(52, 50)
+
+    try:
+        preds, targets = predict(model, df)
+        print("Pred length:", len(preds))
+        print("Target length:", len(targets))
+    except Exception as e:
+        print("Got exception:", e)
+
+    spark.stop()
+
+def make_execute_df(spark, n):
+    data = []
+    for i in range(n):
+        row = {
+            "stock_highs_30d": [100 + i] * 31,
+            "news_sentiment_5d": [1, 0, -1, 1, 0],
+            "news_confidence_5d": [0.9, 0.8, 0.85, 0.7, 0.6],
+            "stock_var": 1.5,
+            "target_price_7d": 110.0,
+        }
+        data.append(row)
+    return spark.createDataFrame(data)
+
+
+def test_execute():
+    print("\nexecute test")
+
+    spark = SparkSession.builder.master("local[*]").appName("executeTest").getOrCreate()
+
+    df = make_execute_df(spark, 10).orderBy("target_price_7d")
+
+    train_df, test_df = df.randomSplit([0.8, 0.2])
+
+    train_size = train_df.count()
+    test_size = test_df.count()
+
+    print(f"Train size: {train_size}")
+    print(f"Test size: {test_size}")
+
+    num_partitions = 2
+    epochs = 1
+    epochs_per_partition = 1
+
+    model = distributed_train(train_df, num_partitions, epochs, epochs_per_partition)
+
+    if test_size > 0:
+        predictions, actual = predict(model, test_df)
+        print(f"Num predictions: {len(predictions)}")
+        print(f"Num actual: {len(actual)}")
+    else:
+        print("Skip predict because test split is empty")
+
+    spark.stop()
 
 
 
@@ -265,7 +420,7 @@ def test_plot_prediction():
     actual = np.array([50, 53, 55, 59, 110, 124, 125])
     predicted = np.array([51, 58, 59, 62, 135, 138, 139])
 
-    plot_predictions(predicted, actual)
+    plot_predictions(predicted, actual, filename="test_prediction_plot.png")
 
 def test_plot_single_point():
     actual = np.array([100])
@@ -299,6 +454,13 @@ def test_plot_empty():
 #test_combine_models_normal()
 #test_combine_models_two()
 #test_combine_empty()
+#test_distributed_train()
+#test_distributed_train_zero()
+#test_distributed_train_single()
+#test_predict()
+#test_predict_single()
+#test_predict_empty()
+#test_execute()
 #test_evaluate()
 #test_evaluate_constant()
 #test_evaluate_length_mismatch() #should throw exception
